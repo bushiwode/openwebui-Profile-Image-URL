@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenWebUI 模型 Profile Image URL 修正工具</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #007bff;
+            margin-bottom: 20px;
+        }
+        .input-group, .options, .rules-section {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="file"], textarea {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 150px;
+            font-family: monospace;
+            resize: vertical;
+        }
+        .options label {
+            display: inline-flex; /* Align checkbox and text */
+            align-items: center;
+            margin-right: 15px; /* Space between options */
+            font-weight: normal; /* Regular weight for options */
+        }
+        .options input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px; /* Slightly smaller padding */
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.95em; /* Slightly smaller font */
+            transition: background-color 0.3s ease;
+            margin-right: 10px;
+            margin-top: 5px; /* Add top margin for buttons */
+            margin-bottom: 5px;
+        }
+        button:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .button-secondary {
+             background-color: #6c757d;
+        }
+         .button-secondary:hover:not(:disabled) {
+             background-color: #5a6268;
+         }
+         .button-danger {
+             background-color: #dc3545;
+         }
+         .button-danger:hover:not(:disabled) {
+             background-color: #c82333;
+         }
+        .logs, .output {
+            margin-top: 25px;
+            border: 1px solid #eee;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 1.2em;
+            color: #555;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: monospace;
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            color: #495057;
+        }
+        .log-item {
+            padding: 5px 0;
+            border-bottom: 1px dashed #ddd;
+            font-size: 0.9em;
+        }
+        .log-item:last-child {
+            border-bottom: none;
+        }
+        .log-item code {
+             font-family: monospace;
+             background-color: #e0e0e0;
+             padding: 2px 4px;
+             border-radius: 3px;
+        }
+        .log-update { color: #28a745; } /* Green */
+        .log-skip { color: #ffc107; }   /* Yellow */
+        .log-notfound { color: #dc3545; } /* Red */
+        .log-summary { font-weight: bold; margin-bottom: 15px; }
+        .error, .success {
+            font-weight: bold;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+         .error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; }
+         .success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb;}
+        .download-section {
+             margin-top: 20px;
+        }
+        details {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            background-color: #fdfdfd;
+        }
+        summary {
+            font-weight: bold;
+            cursor: pointer;
+            color: #0056b3;
+        }
+        .rules-editor {
+            margin-top: 15px;
+        }
+        .rules-actions button {
+            margin-right: 5px;
+        }
+        .import-rules {
+            margin-top: 10px;
+        }
+        .import-rules input[type="file"] { display: inline-block; width: auto;}
+
+    </style>
+</head>
+<body>
+
+<div id="app" class="container">
+    <h1>OpenWebUI 模型 Profile Image URL 批量修正工具</h1>
+    
+    <p style="text-align: center; margin-bottom: 20px;">
+        此工具可以修正模型的 Profile Image URL
+    </p>
+    <p style="text-align: center; margin-bottom: 20px;">
+        并通过每个模型添加 <code>"base_model_id": null</code> 字段。实现了不再需要修改一次来触发的问题。
+    </p>
+
+     <div v-if="statusMessage.text" :class="['status', statusMessage.type]">
+        {{ statusMessage.text }}
+    </div>
+
+    <div class="input-group">
+        <label for="jsonFile">选择 OpenWebUI 导出的 JSON 文件 (models-export-*.json):</label>
+        <input type="file" id="jsonFile" @change="handleFileChange" accept=".json" ref="fileInputRef">
+    </div>
+
+    <div class="options">
+        <label for="dryRun">
+            <input type="checkbox" id="dryRun" v-model="isDryRun">
+            仅预览修正日志 (Dry Run)
+        </label>
+         <label for="overwriteExisting">
+            <input type="checkbox" id="overwriteExisting" v-model="overwriteExisting">
+            允许覆盖已存在的非默认 URL
+        </label>
+    </div>
+
+    <!-- Rules Editor Section -->
+    <div class="rules-section">
+        <details>
+            <summary>编辑/导入/导出匹配规则 (PROVIDER_MAP)</summary>
+            <div class="rules-editor">
+                <label for="rulesText">规则 (JSON 格式: <code>[["keyword1", "url1"], ["keyword2", "url2"], ...]</code>)</label>
+                <textarea id="rulesText" v-model="rulesText" rows="10"></textarea>
+                <div class="rules-actions">
+                    <button @click="saveRules" class="button-secondary">保存规则到浏览器</button>
+                    <button @click="resetRules" class="button-danger">重置为默认规则</button>
+                    <button @click="exportRules" class="button-secondary">导出当前规则</button>
+                </div>
+                 <div class="import-rules">
+                     <label for="importFile">导入规则:</label>
+                    <input type="file" id="importFile" @change="handleRuleImport" accept=".json" ref="importFileRef">
+                 </div>
+            </div>
+        </details>
+    </div>
+    <!-- End Rules Editor Section -->
+
+    <button @click="processJson" :disabled="!fileContent">开始处理模型文件</button>
+
+    <div v-if="error" class="error">
+        处理错误: {{ error }}
+    </div>
+
+    <div v-if="logs.length > 0" class="logs">
+        <h2>处理日志</h2>
+        <p class="log-summary">{{ summary }}</p>
+        <div v-for="(log, index) in logs" :key="index" :class="['log-item', logClass(log)]">
+             <span v-html="log.message.replace(/\[(UPDATE|SKIP|NOT FOUND)\]/g, '<strong>[$1]</strong>')"></span>
+        </div>
+    </div>
+
+    <div v-if="outputJson && !isDryRun" class="output download-section">
+        <h2>修正后的 JSON</h2>
+        <button @click="downloadJson" :disabled="!outputJson">下载修正后的模型文件</button>
+        <pre>{{ outputJson }}</pre>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, reactive, onMounted, watch } = Vue;
+
+    // --- 默认配置数据 ---
+    const DEFAULT_PROVIDER_MAP = [
+        // (关键词,image_url),顺序即优先级
+        ["openrouter/", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/openrouter.svg"],
+        ["aliyun/", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/aliyun-color.svg"],
+        ["gemini_pipe_new.", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/gemini-color.svg"],
+        ["gpt", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/openai.svg"],
+        ["openai", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/openai.svg"],
+        ["o1-", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/openai.svg"],
+        ["o3-", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/openai.svg"],
+        ["whisper", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/openai.svg"],
+        ["text-embedding-", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/dalle-color.svg"],
+        ["tts-", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/dalle-color.svg"],
+        ["dall-e", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/dalle-color.svg"],
+        ["claude", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/claude-color.svg"],
+        ["gemini", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/gemini-color.svg"],
+        ["ernie", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/wenxin-color.svg"],
+        ["baidu", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/wenxin-color.svg"],
+        ["command", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/cohere-color.svg"],
+        ["cohere", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/cohere-color.svg"],
+        ["deepseek", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/deepseek-color.svg"],
+        ["grok", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/grok.svg"],
+        ["llama", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/meta-color.svg"],
+        ["meta", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/meta-color.svg"],
+        ["groq", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/groq-color.svg"],
+        ["qwq", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/qwen-color.svg"],
+        ["qvq", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/qwen-color.svg"],
+        ["qwen", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/qwen-color.svg"],
+        ["abab", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/minimax-color.svg"],
+        ["minimax", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/minimax-color.svg"],
+        ["mistral", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/mistral-color.svg"],
+        ["kimi", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/kimi-color.svg"],
+        ["moonshot", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/kimi-color.svg"],
+        ["ollama", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/ollama-color.svg"],
+        ["hunyuan", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/hunyuan-color.svg"],
+        ["tencent", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/hunyuan-color.svg"],
+        ["yi", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/yi-color.svg"],
+        ["glm", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/qingyan-color.svg"],
+        ["zhipu", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/qingyan-color.svg"],
+        ["open-mixtral","https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/mistral-color.svg"],
+        ["ministral","https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/mistral-color.svg"],
+        ["codestral","https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/mistral-color.svg"],
+        ["pixtral","https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/mistral-color.svg"],
+    ];
+    const DEFAULT_URLS = new Set(["", "/static/favicon.png"]); // 使用 Set 以提高查找效率
+    const LOCAL_STORAGE_KEY = 'openwebui_profile_rules';
+
+    createApp({
+        setup() {
+            // --- Vue 响应式状态 ---
+            const fileContent = ref(null); // 存储文件原始内容 (string)
+            const jsonData = ref([]);    // 存储解析后的 JSON 对象 (array)
+            const isDryRun = ref(false); // 是否为 Dry Run 模式
+            const overwriteExisting = ref(false); // 是否覆盖已有 URL
+            const logs = reactive([]);   // 存储日志消息对象 { type: 'update'|'skip'|'notfound', message: string }
+            const summary = ref('');     // 存储处理结果摘要
+            const outputJson = ref('');  // 存储处理后的 JSON 字符串
+            const error = ref('');       // 存储错误信息
+            const originalFileName = ref(''); // 存储原始文件名
+            const providerMap = ref([]); // 当前使用的规则
+            const rulesText = ref(''); // TextArea绑定的规则文本
+            const statusMessage = reactive({ text: '', type: 'success' }); // 提示信息
+            const fileInputRef = ref(null); // Ref for model file input
+            const importFileRef = ref(null); // Ref for rules import file input
+
+            // --- 方法 ---
+
+            const showStatus = (message, type = 'success', duration = 4000) => {
+                statusMessage.text = message;
+                statusMessage.type = type === 'error' ? 'error' : 'success';
+                setTimeout(() => {
+                    statusMessage.text = '';
+                }, duration);
+            };
+
+             // --- Rules Management ---
+            const loadRules = () => {
+                try {
+                    const storedRules = localStorage.getItem(LOCAL_STORAGE_KEY);
+                    if (storedRules) {
+                        const parsedRules = JSON.parse(storedRules);
+                        // Basic validation
+                        if (Array.isArray(parsedRules) && parsedRules.every(item => Array.isArray(item) && item.length === 2 && typeof item[0] === 'string' && typeof item[1] === 'string')) {
+                             providerMap.value = parsedRules;
+                             showStatus('已从浏览器加载保存的规则。');
+                        } else {
+                             console.warn("LocalStorage 中的规则格式无效，将使用默认规则。");
+                             providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP)); // Deep copy
+                             localStorage.removeItem(LOCAL_STORAGE_KEY); // Remove invalid data
+                        }
+                    } else {
+                        providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP)); // Deep copy
+                    }
+                } catch (e) {
+                    console.error("加载或解析 LocalStorage 规则时出错:", e);
+                    showStatus('加载本地规则失败，使用默认规则。', 'error');
+                    providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP)); // Deep copy
+                }
+                 rulesText.value = JSON.stringify(providerMap.value, null, 2);
+            };
+
+            const saveRules = () => {
+                try {
+                    const newRules = JSON.parse(rulesText.value);
+                    // Basic validation before saving
+                     if (Array.isArray(newRules) && newRules.every(item => Array.isArray(item) && item.length === 2 && typeof item[0] === 'string' && typeof item[1] === 'string')) {
+                        providerMap.value = newRules;
+                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newRules));
+                        showStatus('规则已成功保存到浏览器！');
+                    } else {
+                         showStatus('规则格式无效，请确保其为[["关键字","URL"],...] 的格式。未保存。', 'error');
+                    }
+                } catch (e) {
+                    console.error("保存规则到 LocalStorage 时出错:", e);
+                    showStatus(`保存规则失败: ${e.message}`, 'error');
+                }
+            };
+
+            const resetRules = () => {
+                if (confirm('确定要重置为默认规则吗？当前编辑和已保存的规则将丢失。')) {
+                    providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP)); // Deep copy
+                    rulesText.value = JSON.stringify(providerMap.value, null, 2);
+                    localStorage.removeItem(LOCAL_STORAGE_KEY); // Remove custom rules from storage
+                    showStatus('已重置为默认规则。');
+                }
+            };
+
+            const exportRules = () => {
+                try {
+                    const blob = new Blob([JSON.stringify(providerMap.value, null, 2)], { type: 'application/json;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'openwebui_profile_rules.json';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    showStatus('规则已导出。');
+                } catch (e) {
+                    console.error("导出规则失败:", e);
+                    showStatus('导出规则失败。', 'error');
+                }
+            };
+
+            const handleRuleImport = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const importedRules = JSON.parse(e.target.result);
+                        // Validation
+                         if (Array.isArray(importedRules) && importedRules.every(item => Array.isArray(item) && item.length === 2 && typeof item[0] === 'string' && typeof item[1] === 'string')) {
+                            providerMap.value = importedRules;
+                            rulesText.value = JSON.stringify(providerMap.value, null, 2);
+                            saveRules(); // Optionally save imported rules immediately
+                            showStatus('规则已成功导入并保存！');
+                        } else {
+                             showStatus('导入的文件格式无效，请确保其为 [["关键字","URL"],...] 的 JSON 数组。', 'error');
+                        }
+                    } catch (err) {
+                        console.error("导入规则失败:", err);
+                        showStatus(`导入规则失败: ${err.message}`, 'error');
+                    } finally {
+                         // Reset file input to allow importing the same file again
+                        if (importFileRef.value) {
+                           importFileRef.value.value = '';
+                        }
+                    }
+                };
+                 reader.onerror = (e) => {
+                    showStatus('读取导入文件时出错。', 'error');
+                     if (importFileRef.value) {
+                        importFileRef.value.value = '';
+                     }
+                 }
+                reader.readAsText(file, 'UTF-8');
+            };
+
+            // Watch rulesText for external changes (like import) to potentially update storage implicitly or provide feedback
+            // watch(rulesText, (newValue) => { /* Can add logic here if needed */ });
+
+            // --- Model File Handling ---
+            const handleFileChange = (event) => {
+                const file = event.target.files[0];
+                 clearResults(); // Clear previous results when a new file is selected
+                if (!file) {
+                    fileContent.value = null;
+                    originalFileName.value = '';
+                    return;
+                }
+                originalFileName.value = file.name;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    fileContent.value = e.target.result;
+                };
+                reader.onerror = (e) => {
+                    error.value = '读取模型文件时出错: ' + e.target.error;
+                    clearResults();
+                }
+                reader.readAsText(file, 'UTF-8');
+            };
+
+            const clearResults = () => {
+                 jsonData.value = [];
+                 logs.splice(0, logs.length); // 清空数组
+                 summary.value = '';
+                 outputJson.value = '';
+                 error.value = '';
+                  // Reset file input if needed, though usually not necessary on selection
+                // if(fileInputRef.value) fileInputRef.value.value = '';
+            }
+
+            const findCorrectUrl = (modelId) => {
+                const idLower = modelId.toLowerCase();
+                // Use the reactive providerMap.value here
+                for (const [key, url] of providerMap.value) {
+                    if (idLower.includes(key)) {
+                        return url;
+                    }
+                }
+                return null;
+            };
+
+            const processJson = () => {
+                clearResults(); // Start fresh
+
+                if (!fileContent.value) {
+                    error.value = '请先选择一个模型 JSON 文件。';
+                    return;
+                }
+                if (!providerMap.value || providerMap.value.length === 0) {
+                    error.value = '匹配规则为空，请先定义或导入规则。';
+                    return;
+                }
+
+                try {
+                    let data = JSON.parse(fileContent.value);
+                    if (!Array.isArray(data)) {
+                        throw new Error("JSON 文件顶层结构必须是一个数组。");
+                    }
+
+                    jsonData.value = data; // Store parsed data
+
+                    let updated = 0, skipped = 0, notFound = 0;
+                    let addedBaseModelId = 0; // 计数添加了 base_model_id 的记录
+                    const tempLogs = []; // Temporary log storage
+
+                    for (const model of jsonData.value) {
+                        const modelId = model?.id ?? '';
+                        const meta = model?.meta ?? {};
+                        const currentUrl = meta.profile_image_url ?? '';
+
+                        // 添加 base_model_id 字段（与 meta 同级）
+                        if (!isDryRun.value) {
+                            if (model.base_model_id === undefined) {
+                                model.base_model_id = null;
+                                addedBaseModelId++;
+                            }
+                        }
+
+                        if (!modelId || typeof meta !== 'object') {
+                           tempLogs.push({ type: 'skip', message: `[SKIP] 记录缺少 'id' 或 'meta' 字段，已跳过。`});
+                           skipped++;
+                           continue;
+                        }
+
+                        const correctUrl = findCorrectUrl(modelId);
+
+                        if (correctUrl) {
+                            if (currentUrl === correctUrl) {
+                                skipped++;
+                                tempLogs.push({ type: 'skip', message: `[SKIP] ${modelId} 已是正确 URL: <code>${currentUrl}</code>` });
+                            } else if (DEFAULT_URLS.has(currentUrl) || !currentUrl) {
+                                // Update if empty or default
+                                if (!isDryRun.value) {
+                                    if (!model.meta) model.meta = {};
+                                     model.meta.profile_image_url = correctUrl;
+                                }
+                                updated++;
+                                tempLogs.push({ type: 'update', message: `[UPDATE] ${modelId}<br>&nbsp;&nbsp;原 URL: <code>${currentUrl || '空'}</code><br>&nbsp;&nbsp;新 URL: <code>${correctUrl}</code>` });
+                            } else {
+                                // Existing, non-default URL found
+                                if (overwriteExisting.value) { // Check the overwrite option
+                                    if (!isDryRun.value) {
+                                        if (!model.meta) model.meta = {};
+                                        model.meta.profile_image_url = correctUrl;
+                                    }
+                                    updated++; // Count as updated
+                                    tempLogs.push({ type: 'update', message: `[UPDATE] ${modelId} (覆盖已有)<br>&nbsp;&nbsp;原 URL: <code>${currentUrl}</code><br>&nbsp;&nbsp;新 URL: <code>${correctUrl}</code>` });
+                                } else { // Skip if overwrite is not checked
+                                    skipped++;
+                                    tempLogs.push({ type: 'skip', message: `[SKIP] ${modelId} URL 已存在且与映射不符 (未勾选覆盖): <code>${currentUrl}</code>` });
+                                }
+                            }
+                        } else {
+                            notFound++;
+                            tempLogs.push({ type: 'notfound', message: `[NOT FOUND] ${modelId} 未匹配到规则, 当前 URL: <code>${currentUrl || '空'}</code>` });
+                        }
+                    }
+
+                    // 更新摘要信息，加入添加base_model_id的统计
+                    summary.value = `处理完成: 共 ${jsonData.value.length} 条, 更新URL ${updated} 条, 添加base_model_id ${addedBaseModelId} 条, 跳过 ${skipped} 条, 未匹配到规则 ${notFound} 条。`;
+                    logs.push(...tempLogs); // Push logs reactively
+
+                    if (!isDryRun.value) {
+                        outputJson.value = JSON.stringify(jsonData.value, null, 2);
+                    } else {
+                        outputJson.value = '';
+                        summary.value += ' (Dry Run 预览模式)';
+                    }
+
+                } catch (e) {
+                    error.value = `JSON 解析或处理失败: ${e.message}`;
+                    console.error(e);
+                }
+            };
+
+            const downloadJson = () => {
+                if (!outputJson.value) return;
+                const blob = new Blob([outputJson.value], { type: 'application/json;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                const baseName = originalFileName.value.replace(/\.json$/i, '');
+                link.download = `${baseName}-modified.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            };
+
+            const logClass = (log) => {
+                return `log-${log.type}`;
+            };
+
+            // --- Lifecycle Hook ---
+             onMounted(() => {
+                loadRules(); // Load rules when component is mounted
+             });
+
+            return {
+                fileContent,
+                jsonData,
+                isDryRun,
+                overwriteExisting,
+                logs,
+                summary,
+                outputJson,
+                error,
+                originalFileName,
+                providerMap,
+                rulesText,
+                statusMessage,
+                fileInputRef,
+                importFileRef,
+                handleFileChange,
+                processJson,
+                downloadJson,
+                logClass,
+                // Rules methods
+                loadRules,
+                saveRules,
+                resetRules,
+                exportRules,
+                handleRuleImport,
+            };
+        }
+    }).mount('#app');
+</script>
+
+<footer style="text-align: center; margin-top: 30px; font-size: 0.9em; color: #6c757d;">
+       <p>
+          原始 Python 脚本及核心逻辑思路参考自:
+          <a href="https://linux.do/t/topic/554075" target="_blank" rel="noopener noreferrer">LINUX DO</a>.
+         <br>初版网页出自 <a href="https://linux.do/t/topic/554075/26" target="_blank" rel="noopener noreferrer">xiniah</a>
+         <br>修改意见来自 <a href="https://github.com/U8F69/open-webui/issues/143" target="_blank" rel="noopener noreferrer">方块佬</a>，同时也感谢大佬的二开版OpenWebui。
+         <br>此 HTML/Vue 版本由 AI 根据脚本逻辑创建并添加额外功能。
+      </p>
+    </footer>
+</html>
