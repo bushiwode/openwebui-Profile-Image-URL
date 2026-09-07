@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenWebUI 模型 Profile Image URL 修正工具</title>
+    <title>OpenWebUI 模型头像与默认 Filter 修正工具</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <style>
         body {
-            font-family: sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             line-height: 1.6;
             padding: 20px;
-            max-width: 900px;
+            max-width: 980px;
             margin: 0 auto;
             background-color: #f8f9fa;
             color: #333;
@@ -24,9 +24,14 @@
         h1 {
             text-align: center;
             color: #007bff;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
-        .input-group, .options, .rules-section {
+        .subtitle {
+            text-align: center;
+            margin: 0 0 22px;
+            color: #666;
+        }
+        .input-group, .options, .rules-section, .filter-section {
             margin-bottom: 20px;
         }
         label {
@@ -47,11 +52,16 @@
             font-family: monospace;
             resize: vertical;
         }
+        .options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 18px;
+        }
         .options label {
-            display: inline-flex; /* Align checkbox and text */
+            display: inline-flex;
             align-items: center;
-            margin-right: 15px; /* Space between options */
-            font-weight: normal; /* Regular weight for options */
+            margin: 0;
+            font-weight: normal;
         }
         .options input[type="checkbox"] {
             margin-right: 8px;
@@ -60,34 +70,21 @@
             background-color: #007bff;
             color: white;
             border: none;
-            padding: 10px 15px; /* Slightly smaller padding */
+            padding: 10px 15px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.95em; /* Slightly smaller font */
+            font-size: 0.95em;
             transition: background-color 0.3s ease;
             margin-right: 10px;
-            margin-top: 5px; /* Add top margin for buttons */
+            margin-top: 5px;
             margin-bottom: 5px;
         }
-        button:hover:not(:disabled) {
-            background-color: #0056b3;
-        }
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        .button-secondary {
-             background-color: #6c757d;
-        }
-         .button-secondary:hover:not(:disabled) {
-             background-color: #5a6268;
-         }
-         .button-danger {
-             background-color: #dc3545;
-         }
-         .button-danger:hover:not(:disabled) {
-             background-color: #c82333;
-         }
+        button:hover:not(:disabled) { background-color: #0056b3; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        .button-secondary { background-color: #6c757d; }
+        .button-secondary:hover:not(:disabled) { background-color: #5a6268; }
+        .button-danger { background-color: #dc3545; }
+        .button-danger:hover:not(:disabled) { background-color: #c82333; }
         .logs, .output {
             margin-top: 25px;
             border: 1px solid #eee;
@@ -110,27 +107,23 @@
             background-color: #e9ecef;
             padding: 10px;
             border-radius: 4px;
-            max-height: 300px;
+            max-height: 360px;
             overflow-y: auto;
             color: #495057;
         }
         .log-item {
-            padding: 5px 0;
+            padding: 7px 0;
             border-bottom: 1px dashed #ddd;
             font-size: 0.9em;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
-        .log-item:last-child {
-            border-bottom: none;
-        }
-        .log-item code {
-             font-family: monospace;
-             background-color: #e0e0e0;
-             padding: 2px 4px;
-             border-radius: 3px;
-        }
-        .log-update { color: #28a745; } /* Green */
-        .log-skip { color: #ffc107; }   /* Yellow */
-        .log-notfound { color: #dc3545; } /* Red */
+        .log-item:last-child { border-bottom: none; }
+        .log-update { color: #218838; }
+        .log-filter { color: #0056b3; }
+        .log-fix { color: #6f42c1; }
+        .log-skip { color: #8a6d00; }
+        .log-notfound { color: #c82333; }
         .log-summary { font-weight: bold; margin-bottom: 15px; }
         .error, .success {
             font-weight: bold;
@@ -138,11 +131,9 @@
             padding: 10px;
             border-radius: 4px;
         }
-         .error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; }
-         .success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb;}
-        .download-section {
-             margin-top: 20px;
-        }
+        .error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .download-section { margin-top: 20px; }
         details {
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -154,32 +145,44 @@
             cursor: pointer;
             color: #0056b3;
         }
-        .rules-editor {
-            margin-top: 15px;
+        .rules-editor, .filter-rule-list { margin-top: 15px; }
+        .rules-actions button { margin-right: 5px; }
+        .import-rules { margin-top: 10px; }
+        .import-rules input[type="file"] { display: inline-block; width: auto; }
+        .filter-rule {
+            padding: 10px 12px;
+            margin: 8px 0;
+            border-left: 4px solid #007bff;
+            background: #f4f8ff;
+            border-radius: 4px;
         }
-        .rules-actions button {
-            margin-right: 5px;
+        .filter-rule code { word-break: break-all; }
+        .hint {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 6px;
         }
-        .import-rules {
-            margin-top: 10px;
+        .important {
+            background: #fff8e1;
+            border: 1px solid #ffe08a;
+            padding: 10px 12px;
+            border-radius: 4px;
+            margin-bottom: 18px;
         }
-        .import-rules input[type="file"] { display: inline-block; width: auto;}
-
     </style>
 </head>
 <body>
 
 <div id="app" class="container">
-    <h1>OpenWebUI 模型 Profile Image URL 批量修正工具</h1>
-    
-    <p style="text-align: center; margin-bottom: 20px;">
-        此工具可以修正模型的 Profile Image URL
-    </p>
-    <p style="text-align: center; margin-bottom: 20px;">
-        并通过每个模型添加 <code>"base_model_id": null</code> 字段。实现了不再需要修改一次来触发的问题。
-    </p>
+    <h1>OpenWebUI 模型头像与默认 Filter 批量修正工具</h1>
+    <p class="subtitle">修正普通模型头像，并为 Gemini / GPT 系列自动配置默认 Filter。</p>
 
-     <div v-if="statusMessage.text" :class="['status', statusMessage.type]">
+    <div class="important">
+        <strong>处理规则：</strong>
+        自定义模型（<code>base_model_id</code> 有实际值）不修改头像；Filter 优先按 <code>base_model_id</code> 判断，普通模型则按 <code>id</code> 判断。工具不会新增或修改 <code>base_model_id</code>。
+    </div>
+
+    <div v-if="statusMessage.text" :class="['status', statusMessage.type]">
         {{ statusMessage.text }}
     </div>
 
@@ -193,16 +196,40 @@
             <input type="checkbox" id="dryRun" v-model="isDryRun">
             仅预览修正日志 (Dry Run)
         </label>
-         <label for="overwriteExisting">
+        <label for="overwriteExisting">
             <input type="checkbox" id="overwriteExisting" v-model="overwriteExisting">
-            允许覆盖已存在的非默认 URL
+            允许覆盖普通模型已存在的非默认头像 URL
+        </label>
+        <label for="autoConfigureFilters">
+            <input type="checkbox" id="autoConfigureFilters" v-model="autoConfigureFilters">
+            自动配置 Gemini / GPT 默认 Filters
         </label>
     </div>
 
-    <!-- Rules Editor Section -->
+    <div class="filter-section">
+        <details>
+            <summary>查看默认 Filter 规则</summary>
+            <div class="filter-rule-list">
+                <div class="filter-rule">
+                    <strong>Gemini 系列</strong><br>
+                    匹配：底层模型 ID 包含 <code>gemini</code><br>
+                    默认启用：<code>gemini网页上下文提取</code>、<code>gemini联网</code>
+                </div>
+                <div class="filter-rule">
+                    <strong>GPT / OpenAI 推理系列</strong><br>
+                    匹配：<code>gpt*</code> / <code>o1-*</code> / <code>o3-*</code> / <code>o4-*</code><br>
+                    默认启用：<code>openai_web_search</code>、<code>gpt_reasoning_effort</code>
+                </div>
+                <div class="hint">
+                    写入顺序固定为：先确保 Filter 存在于 <code>filterIds</code>，再加入 <code>defaultFilterIds</code>；并自动修复原文件中违反 <code>defaultFilterIds ⊆ filterIds</code> 的情况。已有其他 Filter 不会被删除。
+                </div>
+            </div>
+        </details>
+    </div>
+
     <div class="rules-section">
         <details>
-            <summary>编辑/导入/导出匹配规则 (PROVIDER_MAP)</summary>
+            <summary>编辑/导入/导出头像匹配规则 (PROVIDER_MAP)</summary>
             <div class="rules-editor">
                 <label for="rulesText">规则 (JSON 格式: <code>[["keyword1", "url1"], ["keyword2", "url2"], ...]</code>)</label>
                 <textarea id="rulesText" v-model="rulesText" rows="10"></textarea>
@@ -211,14 +238,13 @@
                     <button @click="resetRules" class="button-danger">重置为默认规则</button>
                     <button @click="exportRules" class="button-secondary">导出当前规则</button>
                 </div>
-                 <div class="import-rules">
-                     <label for="importFile">导入规则:</label>
+                <div class="import-rules">
+                    <label for="importFile">导入规则:</label>
                     <input type="file" id="importFile" @change="handleRuleImport" accept=".json" ref="importFileRef">
-                 </div>
+                </div>
             </div>
         </details>
     </div>
-    <!-- End Rules Editor Section -->
 
     <button @click="processJson" :disabled="!fileContent">开始处理模型文件</button>
 
@@ -229,9 +255,7 @@
     <div v-if="logs.length > 0" class="logs">
         <h2>处理日志</h2>
         <p class="log-summary">{{ summary }}</p>
-        <div v-for="(log, index) in logs" :key="index" :class="['log-item', logClass(log)]">
-             <span v-html="log.message.replace(/\[(UPDATE|SKIP|NOT FOUND)\]/g, '<strong>[$1]</strong>')"></span>
-        </div>
+        <div v-for="(log, index) in logs" :key="index" :class="['log-item', logClass(log)]">{{ log.message }}</div>
     </div>
 
     <div v-if="outputJson && !isDryRun" class="output download-section">
@@ -242,9 +266,9 @@
 </div>
 
 <script>
-    const { createApp, ref, reactive, onMounted, watch } = Vue;
+    const { createApp, ref, reactive, onMounted } = Vue;
 
-    // --- 默认配置数据 ---
+    // --- 默认头像配置数据 ---
     const DEFAULT_PROVIDER_MAP = [
         // (关键词,image_url),顺序即优先级
         ["openrouter/", "https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/openrouter.svg"],
@@ -288,28 +312,37 @@
         ["codestral","https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/mistral-color.svg"],
         ["pixtral","https://chat2.bushiwodecn.top/@lobehub/icons-static-svg/latest/files/icons/mistral-color.svg"],
     ];
-    const DEFAULT_URLS = new Set(["", "/static/favicon.png"]); // 使用 Set 以提高查找效率
+    const DEFAULT_URLS = new Set(["", "/static/favicon.png"]);
     const LOCAL_STORAGE_KEY = 'openwebui_profile_rules';
+
+    // --- 默认 Filter 配置 ---
+    const GEMINI_DEFAULT_FILTERS = [
+        "gemini网页上下文提取",
+        "gemini联网"
+    ];
+
+    const GPT_DEFAULT_FILTERS = [
+        "openai_web_search",
+        "gpt_reasoning_effort"
+    ];
 
     createApp({
         setup() {
-            // --- Vue 响应式状态 ---
-            const fileContent = ref(null); // 存储文件原始内容 (string)
-            const jsonData = ref([]);    // 存储解析后的 JSON 对象 (array)
-            const isDryRun = ref(false); // 是否为 Dry Run 模式
-            const overwriteExisting = ref(false); // 是否覆盖已有 URL
-            const logs = reactive([]);   // 存储日志消息对象 { type: 'update'|'skip'|'notfound', message: string }
-            const summary = ref('');     // 存储处理结果摘要
-            const outputJson = ref('');  // 存储处理后的 JSON 字符串
-            const error = ref('');       // 存储错误信息
-            const originalFileName = ref(''); // 存储原始文件名
-            const providerMap = ref([]); // 当前使用的规则
-            const rulesText = ref(''); // TextArea绑定的规则文本
-            const statusMessage = reactive({ text: '', type: 'success' }); // 提示信息
-            const fileInputRef = ref(null); // Ref for model file input
-            const importFileRef = ref(null); // Ref for rules import file input
-
-            // --- 方法 ---
+            const fileContent = ref(null);
+            const jsonData = ref([]);
+            const isDryRun = ref(false);
+            const overwriteExisting = ref(false);
+            const autoConfigureFilters = ref(true);
+            const logs = reactive([]);
+            const summary = ref('');
+            const outputJson = ref('');
+            const error = ref('');
+            const originalFileName = ref('');
+            const providerMap = ref([]);
+            const rulesText = ref('');
+            const statusMessage = reactive({ text: '', type: 'success' });
+            const fileInputRef = ref(null);
+            const importFileRef = ref(null);
 
             const showStatus = (message, type = 'success', duration = 4000) => {
                 statusMessage.text = message;
@@ -319,55 +352,61 @@
                 }, duration);
             };
 
-             // --- Rules Management ---
+            // --- 头像规则管理 ---
+            const validateProviderRules = (rules) => {
+                return Array.isArray(rules) && rules.every(item =>
+                    Array.isArray(item) &&
+                    item.length === 2 &&
+                    typeof item[0] === 'string' &&
+                    typeof item[1] === 'string'
+                );
+            };
+
             const loadRules = () => {
                 try {
                     const storedRules = localStorage.getItem(LOCAL_STORAGE_KEY);
                     if (storedRules) {
                         const parsedRules = JSON.parse(storedRules);
-                        // Basic validation
-                        if (Array.isArray(parsedRules) && parsedRules.every(item => Array.isArray(item) && item.length === 2 && typeof item[0] === 'string' && typeof item[1] === 'string')) {
-                             providerMap.value = parsedRules;
-                             showStatus('已从浏览器加载保存的规则。');
+                        if (validateProviderRules(parsedRules)) {
+                            providerMap.value = parsedRules;
+                            showStatus('已从浏览器加载保存的头像规则。');
                         } else {
-                             console.warn("LocalStorage 中的规则格式无效，将使用默认规则。");
-                             providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP)); // Deep copy
-                             localStorage.removeItem(LOCAL_STORAGE_KEY); // Remove invalid data
+                            providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP));
+                            localStorage.removeItem(LOCAL_STORAGE_KEY);
                         }
                     } else {
-                        providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP)); // Deep copy
+                        providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP));
                     }
                 } catch (e) {
-                    console.error("加载或解析 LocalStorage 规则时出错:", e);
-                    showStatus('加载本地规则失败，使用默认规则。', 'error');
-                    providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP)); // Deep copy
+                    console.error('加载头像规则时出错:', e);
+                    showStatus('加载本地头像规则失败，已使用默认规则。', 'error');
+                    providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP));
                 }
-                 rulesText.value = JSON.stringify(providerMap.value, null, 2);
+                rulesText.value = JSON.stringify(providerMap.value, null, 2);
             };
 
             const saveRules = () => {
                 try {
                     const newRules = JSON.parse(rulesText.value);
-                    // Basic validation before saving
-                     if (Array.isArray(newRules) && newRules.every(item => Array.isArray(item) && item.length === 2 && typeof item[0] === 'string' && typeof item[1] === 'string')) {
-                        providerMap.value = newRules;
-                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newRules));
-                        showStatus('规则已成功保存到浏览器！');
-                    } else {
-                         showStatus('规则格式无效，请确保其为[["关键字","URL"],...] 的格式。未保存。', 'error');
+                    if (!validateProviderRules(newRules)) {
+                        showStatus('规则格式无效，请确保为 [["关键字","URL"], ...]。未保存。', 'error');
+                        return;
                     }
+                    providerMap.value = newRules;
+                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newRules));
+                    showStatus('头像规则已成功保存到浏览器！');
                 } catch (e) {
-                    console.error("保存规则到 LocalStorage 时出错:", e);
+                    console.error('保存头像规则时出错:', e);
                     showStatus(`保存规则失败: ${e.message}`, 'error');
                 }
             };
 
             const resetRules = () => {
-                if (confirm('确定要重置为默认规则吗？当前编辑和已保存的规则将丢失。')) {
-                    providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP)); // Deep copy
+                if (confirm('确定要重置为默认头像规则吗？当前编辑和已保存的规则将丢失。')) {
+                    providerMap.value = JSON.parse(JSON.stringify(DEFAULT_PROVIDER_MAP));
                     rulesText.value = JSON.stringify(providerMap.value, null, 2);
-                    localStorage.removeItem(LOCAL_STORAGE_KEY); // Remove custom rules from storage
-                    showStatus('已重置为默认规则。');
+                    localStorage.removeItem(LOCAL_STORAGE_KEY);
+                    showStatus('已重置为默认头像规则。');
                 }
             };
 
@@ -382,10 +421,10 @@
                     link.click();
                     document.body.removeChild(link);
                     URL.revokeObjectURL(url);
-                    showStatus('规则已导出。');
+                    showStatus('头像规则已导出。');
                 } catch (e) {
-                    console.error("导出规则失败:", e);
-                    showStatus('导出规则失败。', 'error');
+                    console.error('导出头像规则失败:', e);
+                    showStatus('导出头像规则失败。', 'error');
                 }
             };
 
@@ -397,41 +436,40 @@
                 reader.onload = (e) => {
                     try {
                         const importedRules = JSON.parse(e.target.result);
-                        // Validation
-                         if (Array.isArray(importedRules) && importedRules.every(item => Array.isArray(item) && item.length === 2 && typeof item[0] === 'string' && typeof item[1] === 'string')) {
-                            providerMap.value = importedRules;
-                            rulesText.value = JSON.stringify(providerMap.value, null, 2);
-                            saveRules(); // Optionally save imported rules immediately
-                            showStatus('规则已成功导入并保存！');
-                        } else {
-                             showStatus('导入的文件格式无效，请确保其为 [["关键字","URL"],...] 的 JSON 数组。', 'error');
+                        if (!validateProviderRules(importedRules)) {
+                            showStatus('导入文件格式无效，请确保为 [["关键字","URL"], ...]。', 'error');
+                            return;
                         }
+                        providerMap.value = importedRules;
+                        rulesText.value = JSON.stringify(providerMap.value, null, 2);
+                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(importedRules));
+                        showStatus('头像规则已成功导入并保存！');
                     } catch (err) {
-                        console.error("导入规则失败:", err);
+                        console.error('导入头像规则失败:', err);
                         showStatus(`导入规则失败: ${err.message}`, 'error');
                     } finally {
-                         // Reset file input to allow importing the same file again
-                        if (importFileRef.value) {
-                           importFileRef.value.value = '';
-                        }
+                        if (importFileRef.value) importFileRef.value.value = '';
                     }
                 };
-                 reader.onerror = (e) => {
+                reader.onerror = () => {
                     showStatus('读取导入文件时出错。', 'error');
-                     if (importFileRef.value) {
-                        importFileRef.value.value = '';
-                     }
-                 }
+                    if (importFileRef.value) importFileRef.value.value = '';
+                };
                 reader.readAsText(file, 'UTF-8');
             };
 
-            // Watch rulesText for external changes (like import) to potentially update storage implicitly or provide feedback
-            // watch(rulesText, (newValue) => { /* Can add logic here if needed */ });
+            // --- 模型文件处理 ---
+            const clearResults = () => {
+                jsonData.value = [];
+                logs.splice(0, logs.length);
+                summary.value = '';
+                outputJson.value = '';
+                error.value = '';
+            };
 
-            // --- Model File Handling ---
             const handleFileChange = (event) => {
                 const file = event.target.files[0];
-                 clearResults(); // Clear previous results when a new file is selected
+                clearResults();
                 if (!file) {
                     fileContent.value = null;
                     originalFileName.value = '';
@@ -443,121 +481,282 @@
                     fileContent.value = e.target.result;
                 };
                 reader.onerror = (e) => {
-                    error.value = '读取模型文件时出错: ' + e.target.error;
-                    clearResults();
-                }
+                    fileContent.value = null;
+                    error.value = '读取模型文件时出错: ' + (e.target.error?.message || e.target.error || '未知错误');
+                };
                 reader.readAsText(file, 'UTF-8');
             };
 
-            const clearResults = () => {
-                 jsonData.value = [];
-                 logs.splice(0, logs.length); // 清空数组
-                 summary.value = '';
-                 outputJson.value = '';
-                 error.value = '';
-                  // Reset file input if needed, though usually not necessary on selection
-                // if(fileInputRef.value) fileInputRef.value.value = '';
-            }
-
             const findCorrectUrl = (modelId) => {
-                const idLower = modelId.toLowerCase();
-                // Use the reactive providerMap.value here
+                const idLower = String(modelId || '').toLowerCase();
                 for (const [key, url] of providerMap.value) {
-                    if (idLower.includes(key)) {
+                    if (idLower.includes(String(key).toLowerCase())) {
                         return url;
                     }
                 }
                 return null;
             };
 
+            const hasCustomBaseModel = (model) => {
+                return typeof model?.base_model_id === 'string' && model.base_model_id.trim() !== '';
+            };
+
+            const getEffectiveFilterModelId = (model) => {
+                const baseModelId = typeof model?.base_model_id === 'string' ? model.base_model_id.trim() : '';
+                const modelId = typeof model?.id === 'string' ? model.id.trim() : '';
+                return (baseModelId || modelId).toLowerCase();
+            };
+
+            const getFilterProfile = (model) => {
+                const id = getEffectiveFilterModelId(model);
+                if (!id) return null;
+
+                if (id.includes('gemini')) {
+                    return { name: 'Gemini', filters: GEMINI_DEFAULT_FILTERS };
+                }
+
+                const isGpt = id.includes('gpt');
+                const isOpenAiReasoning = /^o(?:1|3|4)(?:-|$)/.test(id);
+                if (isGpt || isOpenAiReasoning) {
+                    return { name: 'GPT', filters: GPT_DEFAULT_FILTERS };
+                }
+
+                return null;
+            };
+
+            const ensureMetaObject = (model, tempLogs) => {
+                if (!model.meta || typeof model.meta !== 'object' || Array.isArray(model.meta)) {
+                    const hadInvalidMeta = model.meta !== undefined && model.meta !== null;
+                    model.meta = {};
+                    if (hadInvalidMeta) {
+                        tempLogs.push({ type: 'fix', message: `[FIX] ${model.id || '(无 id)'} 的 meta 不是有效对象，已重建为空对象。` });
+                        return 1;
+                    }
+                }
+                return 0;
+            };
+
+            const ensureArrayField = (meta, fieldName) => {
+                if (Array.isArray(meta[fieldName])) {
+                    return { fixed: false };
+                }
+                const fixed = meta[fieldName] !== undefined && meta[fieldName] !== null;
+                meta[fieldName] = [];
+                return { fixed };
+            };
+
+            // 强制满足 defaultFilterIds ⊆ filterIds，并添加指定的默认 Filter。
+            const ensureFilters = (model, requiredFilters, tempLogs) => {
+                const meta = model.meta;
+                let consistencyFixed = 0;
+                let invalidArrayFixed = 0;
+                const addedToFilterIds = [];
+                const addedToDefaultFilterIds = [];
+
+                const filterField = ensureArrayField(meta, 'filterIds');
+                const defaultField = ensureArrayField(meta, 'defaultFilterIds');
+                if (filterField.fixed) invalidArrayFixed++;
+                if (defaultField.fixed) invalidArrayFixed++;
+
+                // 先修复原文件已有的不一致：defaultFilterIds 中的每项必须先存在于 filterIds。
+                for (const filterId of meta.defaultFilterIds) {
+                    if (!meta.filterIds.includes(filterId)) {
+                        meta.filterIds.push(filterId);
+                        consistencyFixed++;
+                    }
+                }
+
+                // 再添加本模型应默认启用的 Filter：先 filterIds，后 defaultFilterIds。
+                for (const filterId of requiredFilters) {
+                    if (!meta.filterIds.includes(filterId)) {
+                        meta.filterIds.push(filterId);
+                        addedToFilterIds.push(filterId);
+                    }
+                    if (!meta.defaultFilterIds.includes(filterId)) {
+                        meta.defaultFilterIds.push(filterId);
+                        addedToDefaultFilterIds.push(filterId);
+                    }
+                }
+
+                if (invalidArrayFixed > 0) {
+                    tempLogs.push({
+                        type: 'fix',
+                        message: `[FIX] ${model.id || '(无 id)'} 的 Filter 字段类型异常，已重建为数组。`
+                    });
+                }
+
+                if (consistencyFixed > 0) {
+                    tempLogs.push({
+                        type: 'fix',
+                        message: `[FIX] ${model.id || '(无 id)'}：发现 ${consistencyFixed} 个 defaultFilterIds 项不在 filterIds 中，已自动补齐。`
+                    });
+                }
+
+                return {
+                    changed: invalidArrayFixed > 0 || consistencyFixed > 0 || addedToFilterIds.length > 0 || addedToDefaultFilterIds.length > 0,
+                    addedToFilterIds,
+                    addedToDefaultFilterIds,
+                    consistencyFixed,
+                    invalidArrayFixed
+                };
+            };
+
             const processJson = () => {
-                clearResults(); // Start fresh
+                clearResults();
 
                 if (!fileContent.value) {
                     error.value = '请先选择一个模型 JSON 文件。';
                     return;
                 }
                 if (!providerMap.value || providerMap.value.length === 0) {
-                    error.value = '匹配规则为空，请先定义或导入规则。';
+                    error.value = '头像匹配规则为空，请先定义或导入规则。';
                     return;
                 }
 
                 try {
-                    let data = JSON.parse(fileContent.value);
+                    const data = JSON.parse(fileContent.value);
                     if (!Array.isArray(data)) {
-                        throw new Error("JSON 文件顶层结构必须是一个数组。");
+                        throw new Error('JSON 文件顶层结构必须是一个数组。');
                     }
 
-                    jsonData.value = data; // Store parsed data
+                    jsonData.value = data;
+                    const tempLogs = [];
 
-                    let updated = 0, skipped = 0, notFound = 0;
-                    let addedBaseModelId = 0; // 计数添加了 base_model_id 的记录
-                    const tempLogs = []; // Temporary log storage
+                    let avatarUpdated = 0;
+                    let avatarSkipped = 0;
+                    let avatarCustomSkipped = 0;
+                    let avatarNotFound = 0;
+                    let geminiFilterModelsChanged = 0;
+                    let gptFilterModelsChanged = 0;
+                    let filterIdsAdded = 0;
+                    let defaultFilterIdsAdded = 0;
+                    let consistencyFixed = 0;
+                    let invalidFilterFieldsFixed = 0;
+                    let invalidRecords = 0;
 
                     for (const model of jsonData.value) {
-                        const modelId = model?.id ?? '';
-                        const meta = model?.meta ?? {};
-                        const currentUrl = meta.profile_image_url ?? '';
-
-                        // 添加 base_model_id 字段（与 meta 同级）
-                        if (!isDryRun.value) {
-                            if (model.base_model_id === undefined) {
-                                model.base_model_id = null;
-                                addedBaseModelId++;
-                            }
+                        if (!model || typeof model !== 'object' || Array.isArray(model)) {
+                            invalidRecords++;
+                            tempLogs.push({ type: 'skip', message: '[SKIP] 发现非对象模型记录，已跳过。' });
+                            continue;
                         }
 
-                        if (!modelId || typeof meta !== 'object') {
-                           tempLogs.push({ type: 'skip', message: `[SKIP] 记录缺少 'id' 或 'meta' 字段，已跳过。`});
-                           skipped++;
-                           continue;
+                        const modelId = typeof model.id === 'string' ? model.id : '';
+                        if (!modelId) {
+                            invalidRecords++;
+                            tempLogs.push({ type: 'skip', message: '[SKIP] 记录缺少有效 id，已跳过。' });
+                            continue;
                         }
 
-                        const correctUrl = findCorrectUrl(modelId);
+                        invalidFilterFieldsFixed += ensureMetaObject(model, tempLogs);
+                        const meta = model.meta;
 
-                        if (correctUrl) {
-                            if (currentUrl === correctUrl) {
-                                skipped++;
-                                tempLogs.push({ type: 'skip', message: `[SKIP] ${modelId} 已是正确 URL: <code>${currentUrl}</code>` });
-                            } else if (DEFAULT_URLS.has(currentUrl) || !currentUrl) {
-                                // Update if empty or default
-                                if (!isDryRun.value) {
-                                    if (!model.meta) model.meta = {};
-                                     model.meta.profile_image_url = correctUrl;
-                                }
-                                updated++;
-                                tempLogs.push({ type: 'update', message: `[UPDATE] ${modelId}<br>&nbsp;&nbsp;原 URL: <code>${currentUrl || '空'}</code><br>&nbsp;&nbsp;新 URL: <code>${correctUrl}</code>` });
-                            } else {
-                                // Existing, non-default URL found
-                                if (overwriteExisting.value) { // Check the overwrite option
-                                    if (!isDryRun.value) {
-                                        if (!model.meta) model.meta = {};
-                                        model.meta.profile_image_url = correctUrl;
-                                    }
-                                    updated++; // Count as updated
-                                    tempLogs.push({ type: 'update', message: `[UPDATE] ${modelId} (覆盖已有)<br>&nbsp;&nbsp;原 URL: <code>${currentUrl}</code><br>&nbsp;&nbsp;新 URL: <code>${correctUrl}</code>` });
-                                } else { // Skip if overwrite is not checked
-                                    skipped++;
-                                    tempLogs.push({ type: 'skip', message: `[SKIP] ${modelId} URL 已存在且与映射不符 (未勾选覆盖): <code>${currentUrl}</code>` });
-                                }
-                            }
+                        // 1) 头像：自定义模型一律不改；普通模型只根据 model.id 匹配。
+                        if (hasCustomBaseModel(model)) {
+                            avatarCustomSkipped++;
+                            tempLogs.push({
+                                type: 'skip',
+                                message: `[SKIP] ${modelId} 为自定义模型 (base_model_id: ${model.base_model_id})，头像保持不变。`
+                            });
                         } else {
-                            notFound++;
-                            tempLogs.push({ type: 'notfound', message: `[NOT FOUND] ${modelId} 未匹配到规则, 当前 URL: <code>${currentUrl || '空'}</code>` });
+                            const currentUrl = typeof meta.profile_image_url === 'string' ? meta.profile_image_url : '';
+                            const correctUrl = findCorrectUrl(modelId);
+
+                            if (correctUrl) {
+                                if (currentUrl === correctUrl) {
+                                    avatarSkipped++;
+                                    tempLogs.push({ type: 'skip', message: `[SKIP] ${modelId} 头像 URL 已正确。` });
+                                } else if (DEFAULT_URLS.has(currentUrl) || !currentUrl) {
+                                    meta.profile_image_url = correctUrl;
+                                    avatarUpdated++;
+                                    tempLogs.push({
+                                        type: 'update',
+                                        message: `[UPDATE] ${modelId}\n头像原 URL: ${currentUrl || '空'}\n头像新 URL: ${correctUrl}`
+                                    });
+                                } else if (overwriteExisting.value) {
+                                    meta.profile_image_url = correctUrl;
+                                    avatarUpdated++;
+                                    tempLogs.push({
+                                        type: 'update',
+                                        message: `[UPDATE] ${modelId}（覆盖已有头像）\n头像原 URL: ${currentUrl}\n头像新 URL: ${correctUrl}`
+                                    });
+                                } else {
+                                    avatarSkipped++;
+                                    tempLogs.push({
+                                        type: 'skip',
+                                        message: `[SKIP] ${modelId} 已有非默认头像 URL，且未勾选覆盖：${currentUrl}`
+                                    });
+                                }
+                            } else {
+                                avatarNotFound++;
+                                tempLogs.push({
+                                    type: 'notfound',
+                                    message: `[NOT FOUND] ${modelId} 未匹配到头像规则，头像保持不变。`
+                                });
+                            }
+                        }
+
+                        // 2) Filter：优先 base_model_id，其次 model.id。不会写入 base_model_id。
+                        if (autoConfigureFilters.value) {
+                            const profile = getFilterProfile(model);
+                            if (profile) {
+                                const result = ensureFilters(model, profile.filters, tempLogs);
+                                filterIdsAdded += result.addedToFilterIds.length;
+                                defaultFilterIdsAdded += result.addedToDefaultFilterIds.length;
+                                consistencyFixed += result.consistencyFixed;
+                                invalidFilterFieldsFixed += result.invalidArrayFixed;
+
+                                if (result.changed) {
+                                    if (profile.name === 'Gemini') geminiFilterModelsChanged++;
+                                    if (profile.name === 'GPT') gptFilterModelsChanged++;
+
+                                    const details = [];
+                                    if (result.addedToFilterIds.length) {
+                                        details.push(`加入 filterIds: ${result.addedToFilterIds.join(', ')}`);
+                                    }
+                                    if (result.addedToDefaultFilterIds.length) {
+                                        details.push(`加入 defaultFilterIds: ${result.addedToDefaultFilterIds.join(', ')}`);
+                                    }
+                                    if (!details.length) {
+                                        details.push('仅执行了 Filter 一致性修复。');
+                                    }
+                                    tempLogs.push({
+                                        type: 'filter',
+                                        message: `[FILTER] ${modelId} → ${profile.name}\n底层判断 ID: ${getEffectiveFilterModelId(model)}\n${details.join('\n')}`
+                                    });
+                                } else {
+                                    tempLogs.push({
+                                        type: 'skip',
+                                        message: `[SKIP] ${modelId} 的 ${profile.name} 默认 Filters 已完整配置。`
+                                    });
+                                }
+                            }
                         }
                     }
 
-                    // 更新摘要信息，加入添加base_model_id的统计
-                    summary.value = `处理完成: 共 ${jsonData.value.length} 条, 更新URL ${updated} 条, 添加base_model_id ${addedBaseModelId} 条, 跳过 ${skipped} 条, 未匹配到规则 ${notFound} 条。`;
-                    logs.push(...tempLogs); // Push logs reactively
+                    summary.value = [
+                        `处理完成：共 ${jsonData.value.length} 条`,
+                        `更新头像 ${avatarUpdated} 条`,
+                        `自定义模型跳过头像 ${avatarCustomSkipped} 条`,
+                        `其他头像跳过 ${avatarSkipped} 条`,
+                        `头像未匹配 ${avatarNotFound} 条`,
+                        `配置/修复 Gemini Filter 模型 ${geminiFilterModelsChanged} 条`,
+                        `配置/修复 GPT Filter 模型 ${gptFilterModelsChanged} 条`,
+                        `新增 filterIds 项 ${filterIdsAdded} 个`,
+                        `新增 defaultFilterIds 项 ${defaultFilterIdsAdded} 个`,
+                        `一致性补齐 ${consistencyFixed} 个`,
+                        `修复异常字段 ${invalidFilterFieldsFixed} 处`,
+                        `无效记录 ${invalidRecords} 条`
+                    ].join('；') + '。';
+
+                    logs.push(...tempLogs);
 
                     if (!isDryRun.value) {
                         outputJson.value = JSON.stringify(jsonData.value, null, 2);
                     } else {
                         outputJson.value = '';
-                        summary.value += ' (Dry Run 预览模式)';
+                        summary.value += '（Dry Run 预览模式：不会生成修改后的下载文件）';
                     }
-
                 } catch (e) {
                     error.value = `JSON 解析或处理失败: ${e.message}`;
                     console.error(e);
@@ -578,20 +777,18 @@
                 URL.revokeObjectURL(url);
             };
 
-            const logClass = (log) => {
-                return `log-${log.type}`;
-            };
+            const logClass = (log) => `log-${log.type}`;
 
-            // --- Lifecycle Hook ---
-             onMounted(() => {
-                loadRules(); // Load rules when component is mounted
-             });
+            onMounted(() => {
+                loadRules();
+            });
 
             return {
                 fileContent,
                 jsonData,
                 isDryRun,
                 overwriteExisting,
+                autoConfigureFilters,
                 logs,
                 summary,
                 outputJson,
@@ -606,24 +803,24 @@
                 processJson,
                 downloadJson,
                 logClass,
-                // Rules methods
                 loadRules,
                 saveRules,
                 resetRules,
                 exportRules,
-                handleRuleImport,
+                handleRuleImport
             };
         }
     }).mount('#app');
 </script>
 
 <footer style="text-align: center; margin-top: 30px; font-size: 0.9em; color: #6c757d;">
-       <p>
-          原始 Python 脚本及核心逻辑思路参考自:
-          <a href="https://linux.do/t/topic/554075" target="_blank" rel="noopener noreferrer">LINUX DO</a>.
-         <br>初版网页出自 <a href="https://linux.do/t/topic/554075/26" target="_blank" rel="noopener noreferrer">xiniah</a>
-         <br>修改意见来自 <a href="https://github.com/U8F69/open-webui/issues/143" target="_blank" rel="noopener noreferrer">方块佬</a>，同时也感谢大佬的二开版OpenWebui。
-         <br>此 HTML/Vue 版本由 AI 根据脚本逻辑创建并添加额外功能。
-      </p>
-    </footer>
+    <p>
+        原始 Python 脚本及核心逻辑思路参考自:
+        <a href="https://linux.do/t/topic/554075" target="_blank" rel="noopener noreferrer">LINUX DO</a>.
+        <br>初版网页出自 <a href="https://linux.do/t/topic/554075/26" target="_blank" rel="noopener noreferrer">xiniah</a>
+        <br>修改意见来自 <a href="https://github.com/U8F69/open-webui/issues/143" target="_blank" rel="noopener noreferrer">方块佬</a>，同时也感谢大佬的二开版 OpenWebUI。
+        <br>此 HTML/Vue 版本在原逻辑基础上加入默认 Filter 配置与一致性修复。
+    </p>
+</footer>
+</body>
 </html>
